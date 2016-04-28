@@ -832,6 +832,44 @@ void UnicodeTest() {
                      "\\u5225\\u30B5\\u30A4\\u30C8\\x01\\x80\"}", true);
 }
 
+void UnicodeSurrogatesTest() {
+  flatbuffers::Parser parser;
+
+  TEST_EQ(
+    parser.Parse(
+      "table T { F:string; }"
+      "root_type T;"
+      "{ F:\"\\uD83D\\uDCA9\"}"), true);
+  auto root = flatbuffers::GetRoot<flatbuffers::Table>(
+    parser.builder_.GetBufferPointer());
+  auto string = root->GetPointer<flatbuffers::String *>(
+    sizeof(flatbuffers::soffset_t));
+  TEST_EQ(strcmp(string->c_str(), "\xF0\x9F\x92\xA9"), 0);
+}
+
+void UnicodeInvalidSurrogatesTest() {
+  TestError(
+    "table T { F:string; }"
+    "root_type T;"
+    "{ F:\"\\uD800\"}", "unpaired high surrogate");
+  TestError(
+    "table T { F:string; }"
+    "root_type T;"
+    "{ F:\"\\uD800abcd\"}", "unpaired high surrogate");
+  TestError(
+    "table T { F:string; }"
+    "root_type T;"
+    "{ F:\"\\uD800\\n\"}", "unpaired high surrogate");
+  TestError(
+    "table T { F:string; }"
+    "root_type T;"
+    "{ F:\"\\uD800\\uD800\"}", "multiple high surrogates");
+  TestError(
+    "table T { F:string; }"
+    "root_type T;"
+    "{ F:\"\\uDC00\"}", "unpaired low surrogate");
+}
+
 void UnknownFieldsTest() {
   flatbuffers::IDLOptions opts;
   opts.skip_unexpected_fields_in_json = true;
@@ -879,6 +917,8 @@ int main(int /*argc*/, const char * /*argv*/[]) {
   ScientificTest();
   EnumStringsTest();
   UnicodeTest();
+  UnicodeSurrogatesTest();
+  UnicodeInvalidSurrogatesTest();
   UnknownFieldsTest();
 
   if (!testing_fails) {
@@ -889,4 +929,3 @@ int main(int /*argc*/, const char * /*argv*/[]) {
     return 1;
   }
 }
-
